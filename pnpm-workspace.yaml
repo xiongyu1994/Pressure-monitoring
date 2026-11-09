@@ -1,0 +1,4 @@
+allowBuilds:
+  '@serialport/bindings-cpp': set this to true or false
+  core-js: set this to true or false
+  electron-winstaller: set this to true or false
