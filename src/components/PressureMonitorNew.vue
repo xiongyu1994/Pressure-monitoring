@@ -3,7 +3,21 @@
     <!-- 顶部操作栏 -->
     <div class="header">
       <h2>压力实时监控系统</h2>
-      <div class="actions">
+      <div class="address-switcher" data-html2canvas-ignore="true">
+        <span>当前设备：</span>
+        <button 
+          v-for="addr in [1, 2, 3]" 
+          :key="addr"
+          class="addr-btn"
+          :class="{ active: currentAddress === addr }"
+          @click="switchAddress(addr)"
+        >
+          地址 {{ addr }}
+        </button>
+      </div>
+      
+    </div>
+    <div class="actions">
         <!-- ⚠️ 新增：零点校准按钮 -->
         <button 
           class="action-btn calibrate-btn" 
@@ -13,6 +27,15 @@
         >
           {{ isCalibrating ? '⏳ 校准中...' : '🎯 零点校准' }}
         </button>
+
+         <!-- <n-button 
+          type="primary" 
+          :loading="isCalibrating"
+          @click="handleCalibrate"
+          data-html2canvas-ignore="true"
+        >
+          {{ isCalibrating ? '校准中...' : '🎯 零点校准' }}
+        </n-button> -->
 
         <button 
           class="action-btn pause-btn" 
@@ -32,7 +55,6 @@
           {{ isExporting ? '生成中...' : '📄 导出 PDF 报告' }}
         </button>
       </div>
-    </div>
     
     <!-- 需要被导出的区域 -->
     <div class="export-area" ref="exportAreaRef">
@@ -79,6 +101,8 @@ import * as echarts from 'echarts'
 import html2canvas from 'html2canvas'
 import { jsPDF } from 'jspdf'
 import QRCode from 'qrcode'
+// 当前选中的传感器地址，默认 2
+const currentAddress = ref(2)
 
 // ================= 状态定义 =================
 const wsUrl = 'ws://localhost:8080' 
@@ -108,6 +132,29 @@ const displayPressure = computed(() => pressure.value !== null ? pressure.value.
 
 const timeData = []
 const pressureData = []
+
+// 切换地址的方法
+const switchAddress = (addr) => {
+  if (currentAddress.value === addr) return // 如果点的还是当前地址，不处理
+  
+  if (!wsInstance || wsInstance.readyState !== WebSocket.OPEN) {
+    alert('WebSocket 未连接，无法切换！')
+    return
+  }
+
+  // 更新当前地址
+  currentAddress.value = addr
+  
+  // 发送指令给后端
+  wsInstance.send(JSON.stringify({ action: 'switchAddress', address: addr }))
+  
+  // 清空当前图表数据，避免不同量程的数据混在一起
+  timeData.length = 0
+  pressureData.length = 0
+  if (chartInstance) {
+    chartInstance.setOption({ xAxis: { data: [] }, series: [{ data: [] }] })
+  }
+}
 
 // ================= ⚠️ 新增：零点校准处理逻辑 =================
 const handleCalibrate = () => {
@@ -185,9 +232,23 @@ const initChart = () => {
       nameTextStyle: { color: '#00FF00', fontSize: 14 },
       axisLine: { show: true, lineStyle: { color: '#00FF00', width: 1 } },
       axisTick: { inside: true, lineStyle: { color: '#00FF00' } },
-      axisLabel: { color: '#00FF00', formatter: (value) => value.toFixed(3) },
+      axisLabel: { color: '#00FF00', formatter: (value) => value.toFixed(1) },
       splitLine: { show: true, lineStyle: { color: '#00FF00', type: 'solid', opacity: 0.3 } }
     },
+    // yAxis: {
+    //   type: 'value',
+    //   name: '压力(MPa)',
+    //   nameLocation: 'middle',
+    //   nameGap: 45, 
+    //   nameTextStyle: { color: '#00FF00', fontSize: 14 },
+    //   // 👇 新增这两行，强制 Y 轴从 0 开始，且最大不超过 55
+    //   min: 0, 
+    //   max: PRESSURE_MAX, 
+    //   axisLine: { show: true, lineStyle: { color: '#00FF00', width: 1 } },
+    //   axisTick: { inside: true, lineStyle: { color: '#00FF00' } },
+    //   axisLabel: { color: '#00FF00', formatter: (value) => value.toFixed(3) },
+    //   splitLine: { show: true, lineStyle: { color: '#00FF00', type: 'solid', opacity: 0.3 } }
+    // },
     animation: false, 
     series: [
       { 
@@ -314,7 +375,7 @@ onUnmounted(() => {
 })
 </script>
 
-<style scoped>
+<style scoped lang="scss">
 .monitor-container { padding: 20px; font-family: system-ui; background: #f5f5f5; min-height: 100vh; box-sizing: border-box;}
 .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
 h2 {color:#000}
@@ -355,5 +416,30 @@ h2 {color:#000}
 @keyframes flash {
   from { background-color: #ff4d4f; }
   to { background-color: #ff7875; }
+}
+
+.address-switcher {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: 20px;
+  color: #333;
+  font-weight: bold;
+}
+.addr-btn {
+  padding: 6px 16px;
+  border: 1px solid #1890ff;
+  background: #fff;
+  color: #1890ff;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+.addr-btn:hover {
+  background: #e6f7ff;
+}
+.addr-btn.active {
+  background: #1890ff;
+  color: #fff;
 }
 </style>
