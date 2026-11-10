@@ -1,32 +1,35 @@
 <!-- src/App.vue -->
 <template>
+  <n-config-provider :locale="zhCN" :date-locale="dateZhCN">
+    <n-message-provider>
   <div class="layout">
     <!-- 左侧侧边栏 -->
-    <aside class="sidebar">
+    <!-- <aside class="sidebar">
       <div class="logo">压力监控系统</div>
       <nav>
-        <router-link to="/pressure-industrial" class="nav-item">
+        <router-link to="/home" class="nav-item">
           🌡️ 传感器压力监测
         </router-link>
         <router-link to="/pressure" class="nav-item">
           📈 普通压力
         </router-link>
-        <router-link to="/temperature" class="nav-item">
-          💧 温湿度监控
-        </router-link>
-        <router-link to="/echarts-demo" class="nav-item">
-          📊 ECharts 示例
-        </router-link>
+        
       </nav>
-    </aside>
+    </aside> -->
 
     <!-- 右侧主内容区 -->
     <main class="content">
       <router-view></router-view>
     </main>
   </div>
+  </n-message-provider>
+  </n-config-provider>
 </template>
 
+<script setup>
+// 引入需要的组件和中文包
+import { NConfigProvider, NMessageProvider, zhCN, dateZhCN } from 'naive-ui'
+</script>
 <style>
 body { margin: 0; padding: 0; font-family: system-ui; }
 .layout { display: flex; height: 100vh; overflow: hidden; }

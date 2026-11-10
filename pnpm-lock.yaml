@@ -11,6 +11,9 @@ importers:
       '@serialport/parser-readline':
         specifier: ^13.0.0
         version: 13.0.0
+      '@vicons/ionicons5':
+        specifier: ^0.13.0
+        version: 0.13.0
       axios:
         specifier: ^1.21.0
         version: 1.21.0(debug@4.4.3(supports-color@7.2.0))(supports-color@7.2.0)
@@ -503,6 +506,9 @@ packages:
 
   '@types/trusted-types@2.0.7':
     resolution: {integrity: sha512-ScaPdn1dQczgbl0QFTeTOmVHFULt394XJgOQNoyVhZ6r2vLnMLJfBPd53SB52T/3G36VI1/g2MZaX0cwDuXsfw==}
+
+  '@vicons/ionicons5@0.13.0':
+    resolution: {integrity: sha512-zvZKBPjEXKN7AXNo2Na2uy+nvuv6SP4KAMQxpKL2vfHMj0fSvuw7JZcOPCjQC3e7ayssKnaoFVAhbYcW6v41qQ==}
 
   '@vitejs/plugin-vue@6.0.10':
     resolution: {integrity: sha512-b80aUQh3n+qEzzZm5oQp3rT2QImeCx58K6eFl/RkJ3d65KW0kTuv5lNsLRVAjbW9YRUpo/wzmvzMgV34bTAItA==}
@@ -2447,6 +2453,8 @@ snapshots:
 
   '@types/trusted-types@2.0.7':
     optional: true
+
+  '@vicons/ionicons5@0.13.0': {}
 
   '@vitejs/plugin-vue@6.0.10(vite@8.3.5(@types/node@26.6.6)(jiti@2.7.0)(sass@1.108.1))(vue@3.5.44)':
     dependencies:

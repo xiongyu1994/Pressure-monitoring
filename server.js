@@ -34,7 +34,7 @@ const startPollingTimer = () => {
       }
       
       let pressure = rawValue / DIVISOR;
-      if (pressure < 0) pressure = 0; // 防止负压漂移
+      // if (pressure < 0) pressure = 0; // 防止负压漂移
       pressure = Number(pressure.toFixed(2)); // 在源头保留两位小数
       const isWarn = pressure > PRESSURE_MAX;
       const status = isWarn ? '超压报警' : '正常';
@@ -49,7 +49,7 @@ const startPollingTimer = () => {
     } catch (e) {
       console.error("读取寄存器异常：", e.message);
     }
-  }, 500);
+  }, 1000);
 };
 
 const stopPollingTimer = () => {

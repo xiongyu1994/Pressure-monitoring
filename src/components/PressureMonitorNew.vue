@@ -109,7 +109,7 @@ const currentAddress = ref(2)
 
 // ================= 状态定义 =================
 const wsUrl = 'ws://localhost:8080' 
-const MAX_POINTS = 60 
+const MAX_POINTS = 100
 const PRESSURE_MAX = 55 
 
 const chartRef = ref(null) 
@@ -131,7 +131,7 @@ const qrCodeUrl = ref('')
 const isCalibrating = ref(false)
 
 // 格式化压力显示
-const displayPressure = computed(() => pressure.value !== null ? pressure.value.toFixed(3) : '--')
+const displayPressure = computed(() => pressure.value !== null ? pressure.value.toFixed(2) : '--')
 
 const timeData = []
 const pressureData = []
@@ -222,12 +222,33 @@ const initChart = () => {
     legend: { show: false },
     grid: { left: '60px', right: '30px', bottom: '30px', top: '30px' },
     xAxis: {
+
+
       type: 'category',
-      data: timeData,
+      // 👇 关键：初始化时直接把 X 轴写死为 0 到 19 的数组
+      data: Array.from({ length: MAX_POINTS + 1  }, (_, i) => i),
+      boundaryGap: false,
       axisLine: { onZero: false, lineStyle: { color: '#00FF00', width: 1 } },
-      axisTick: { inside: true, lineStyle: { color: '#00FF00' } },
-      axisLabel: { color: '#00FF00', fontSize: 12 },
-      splitLine: { show: false } 
+      axisTick: { 
+       show: true,         // 确保显示刻度线
+        inside: true,       // 刻度朝内
+        alignWithLabel: true, // 让刻度线对准数字
+        interval: 0,        // 👈 核心：0 代表强制显示所有（0~100）的刻度线
+        lineStyle: { 
+          color: '#00FF00',
+          //length: 5 // 如果你觉得密集，可以改短一点，默认是 5
+        } 
+
+      },
+      axisLabel: { 
+        color: '#00FF00', 
+        fontSize: 12,
+        interval: 9, // 每隔一个显示（0, 2, 4... 18）
+      },
+      splitLine: { show: false },
+      // 👇 关键：强制锁定显示范围，不管有没有数据，刻度都在
+      min: 0,
+      max: MAX_POINTS 
     },
     yAxis: {
       type: 'value',
@@ -321,7 +342,6 @@ const connectWs = () => {
       if (isPaused.value) return; 
       
       const d = JSON.parse(ev.data)
-
       // ⚠️ 新增：处理后端发来的系统提示信息（包括校准状态）
       if (d.type === 'msg') {
         console.log('系统消息:', d.message)
@@ -334,24 +354,41 @@ const connectWs = () => {
       }
       
       // 接收 Node.js 传来的压力数据
-      pressure.value = Number(d.pressure)
+
+      let rawPressure = Number(d.pressure)
+      // if (rawPressure < 0) rawPressure = 0 // 防止负压漂移
+
+
+      pressure.value = rawPressure  //Number(d.pressure)
       isAlarm.value = d.warn
       alarmMsg.value = d.status
       currentTime.value = new Date().toLocaleString()
       
       if (d.warn) playBeep()
 
-      timeData.push(timeData.length)
-      pressureData.push(Number(d.pressure))
-      
-      if (timeData.length > MAX_POINTS) {
-        timeData.shift()
-        pressureData.shift()
+      // timeData.push(timeData.length)
+      // pressureData.push(Number(d.pressure))
+      // if (timeData.length > MAX_POINTS) {
+      //   timeData.shift()
+      //   pressureData.shift()
+      // }
+
+      pressureData.push(rawPressure)
+      // 超过 20 个点就挤掉最前面的点
+      if (pressureData.length > MAX_POINTS) {
+        //pressureData.shift()
+        pressureData.length = 0
       }
-      const newXAxis = timeData.map((_, index) => index);
+      pressureData.push(rawPressure)
+      
+    
+      //const newXAxis = timeData.map((_, index) => index);
+      // const newXAxis = Array.from({ length: pressureData.length }, (_, i) => i);
       if (chartInstance) {
+        const newXAxis = Array.from({ length: pressureData.length }, (_, i) => i);
         chartInstance.setOption({
-          xAxis: { data: newXAxis  },
+          // xAxis: { data: newXAxis  },
+          xAxis: { data: Array.from({ length: MAX_POINTS + 1 }, (_, i) => i) },
           series: [{ data: pressureData }]
         })
       }

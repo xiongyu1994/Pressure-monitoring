@@ -4,7 +4,12 @@ import { createRouter, createWebHashHistory } from 'vue-router'
 const routes = [
   {
     path: '/',
-    redirect: '/pressure-industrial' // 默认打开哪个页面
+    redirect: '/home' // 默认打开哪个页面
+  },
+  {
+    path: '/home',
+    name: 'Home',
+    component: () => import('../page/home.vue')
   },
   {
     path: '/pressure-industrial',
@@ -16,16 +21,7 @@ const routes = [
     name: 'Pressure',
     component: () => import('../components/PressureMonitor.vue')
   },
-  {
-    path: '/temperature',
-    name: 'Temperature',
-    component: () => import('../components/TemperatureMonitor.vue')
-  },
-  {
-    path: '/echarts-demo',
-    name: 'EchartDemo',
-    component: () => import('../components/EhartMonitor.vue')
-  }
+  
 ]
 
 const router = createRouter({
