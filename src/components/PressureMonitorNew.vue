@@ -101,6 +101,9 @@ import * as echarts from 'echarts'
 import html2canvas from 'html2canvas'
 import { jsPDF } from 'jspdf'
 import QRCode from 'qrcode'
+
+
+
 // 当前选中的传感器地址，默认 2
 const currentAddress = ref(2)
 
@@ -132,6 +135,8 @@ const displayPressure = computed(() => pressure.value !== null ? pressure.value.
 
 const timeData = []
 const pressureData = []
+
+
 
 // 切换地址的方法
 const switchAddress = (addr) => {
