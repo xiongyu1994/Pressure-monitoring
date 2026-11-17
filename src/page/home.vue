@@ -18,13 +18,20 @@
     <!-- 压力组件 -->
     <PressureMonitorNew></PressureMonitorNew>
     <!-- 任务组件 -->
-    <TaskListModal ref="taskModalRef" />
+    <TaskListModal ref="taskModalRef" @sendTask="getTask"/>
     <!-- 预览组件 -->
     <PreviewModal ref="previewModalRef" />
     <!-- 填写评论 -->
     <CommentFormModal ref="commentModalRef" />
-
-
+    <!-- 重新校验弹窗 -->
+    <RestartModal ref="restartModalRef" />
+    <div class="foot">
+      <n-space align="center" v-if = "activeKey === 'setPressure'">
+        <n-button type="primary" @click="reverify">重新校验</n-button>
+        <p>整定压力</p>
+      </n-space>
+    </div>
+    
 </template>
 
 <script setup>
@@ -41,10 +48,14 @@ import {
   SettingsOutline, // 操作设置
   OptionsOutline   // 校压力
 } from '@vicons/ionicons5'
+import { usePressureStore } from '@/store/usePressureStore'
+const store = usePressureStore()
 const activeKey = ref('')
 const taskModalRef = ref()
 const previewModalRef = ref()
 const commentModalRef = ref()
+const restartModalRef = ref()
+const taskId = ref('')
 const tabs = [
     { name: 'task', label: '任务栏', icon: ListOutline },
     { name: 'setPressure', label: '整定压力', icon: TrendingDownOutline },
@@ -55,9 +66,20 @@ const tabs = [
     { name: 'settings', label: '操作设置', icon: SettingsOutline },
     { name: 'calibrate', label: '校压力', icon: OptionsOutline },
 ]
+const getTask = (data) => {
+  taskId.value = data.taskId
+
+
+  //获取当前任务 相关数据  1.整体传入  2.接口查询
+  
+
+}
+// 重新校验
+const reverify = () => {
+  restartModalRef.value?.open()
+}
 const handleOpenTaskModal = (item) => {
     activeKey.value = item.name
-    console.log("activeKey.value...",activeKey.value)
     switch (activeKey.value) {
         case 'task': 
             taskModalRef.value?.open()
@@ -109,5 +131,12 @@ const handleOpenTaskModal = (item) => {
   color: #ffffff;
   background: rgba(255, 255, 255, 0.2);
   //border-bottom: 3px solid #1890ff; /* 底部加个蓝条，更有工业软件的感觉 */
+}
+
+.foot {
+  padding-left: 20px;
+  p {
+    color: #ff7875;
+  }
 }
 </style>

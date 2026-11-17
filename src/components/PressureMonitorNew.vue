@@ -80,7 +80,7 @@
       <div ref="chartRef" class="chart-box"></div>
 
       <!-- 报告底部信息与二维码区域 -->
-      <div class="report-footer">
+      <!-- <div class="report-footer">
         <div class="qr-box">
           <img v-if="qrCodeUrl" :src="qrCodeUrl" alt="二维码" class="qr-img" />
           <p>扫码查看设备详情</p>
@@ -90,7 +90,7 @@
           <p>设备编号：PRESSURE-DEV-001</p>
           <p>生成时间：{{ currentTime }}</p>
         </div>
-      </div>
+      </div> -->
     </div>
   </div>
 </template>
@@ -418,7 +418,7 @@ onUnmounted(() => {
 </script>
 
 <style scoped lang="scss">
-.monitor-container { padding: 20px; font-family: system-ui; background: #f5f5f5; min-height: 100vh; box-sizing: border-box;}
+.monitor-container { padding: 20px; font-family: system-ui; background: #f5f5f5; box-sizing: border-box;}
 .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
 h2 {color:#000}
 .actions { display: flex; gap: 10px; }

@@ -47,6 +47,7 @@
     "html2canvas": "^1.4.1",
     "jspdf": "^4.2.1",
     "modbus-serial": "^8.0.25",
+    "pinia": "^4.1.0",
     "qrcode": "^1.5.4",
     "serialport": "^13.0.0",
     "vue": "^3.5.44",

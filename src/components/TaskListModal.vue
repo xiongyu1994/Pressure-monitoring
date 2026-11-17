@@ -14,7 +14,10 @@
       <div class="header-stats">
         当前需要校验的安全阀数目 <span class="highlight">{{ tableData.length }}</span> 个
       </div>
+      
     </template>
+
+    <n-button type="primary" @click="startTuning">开始整定</n-button>
 
     <div class="modal-content">
       <!-- 顶部搜索栏 -->
@@ -50,7 +53,7 @@
 </template>
 
 <script setup>
-import { ref, computed, h } from 'vue'
+import { ref, computed } from 'vue'
 import { NModal, NSpace, NInput, NButton, NDataTable, useMessage } from 'naive-ui'
 
 // 控制弹窗显示
@@ -60,6 +63,8 @@ const searchKeyword = ref('')
 // 表格引用（用于获取选中行等）
 const tableRef = ref(null)
 const message = useMessage()
+
+const emit = defineEmits(['sendTask'])
 
 // 定义行数据的类型（如果使用 TS）
 // interface TaskRow { ... }
@@ -114,6 +119,12 @@ const rowProps = (row) => {
   }
 }
 
+// 开始整定
+const startTuning = () => {
+  
+  emit('sendTask',{taskId:activeRowId.value})
+  showModal.value = false
+}
 const handleSearch = () => {
     
 }
@@ -122,7 +133,7 @@ const handleSearch = () => {
 const open = () => {
   showModal.value = true
 }
-defineExpose({ open })
+defineExpose({ open,activeRowId })
 </script>
 
 <style scoped>

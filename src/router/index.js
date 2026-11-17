@@ -11,6 +11,12 @@ const routes = [
     name: 'Home',
     component: () => import('../page/home.vue')
   },
+  //测试
+  {
+    path: '/inspectionList',
+    name: 'InspectionList',
+    component: () => import('../page/InspectionList.vue')
+  },
   {
     path: '/pressure-industrial',
     name: 'PressureIndustrial',
