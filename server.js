@@ -4,10 +4,21 @@ const WebSocket = require('ws');
 // ================= 配置区 =================
 const portPath = 'COM3';
 const baudRate = 9600;
-const slaveId = 2; 
-const DIVISOR = 1000; 
+const slaveId = 2;
+const DIVISOR = 1000;
 const PRESSURE_MAX = 10.0;
-// ==========================================
+
+// ================= 模拟压力数据（测试用，传感器未加压时开启） =================
+// 现在压力传感器没有加压，Modbus 读数一直是 0，无法看到数据曲线。
+// 开启此开关后不读传感器，改为模拟压力：
+//   按正弦波形模拟——压力从 0 平滑升到 1 MPa，再平滑回落到 0，循环往复（无直线段、峰谷圆滑），
+//   用于测试数据曲线展示。
+// 传感器接好、正式校验时，把 SIMULATE_PRESSURE 改为 false 即可恢复读取真实传感器数据。
+const SIMULATE_PRESSURE = true;              // true=使用模拟压力测试曲线；false=读取真实传感器（Modbus）
+const SIM_MAX = 1;                           // 模拟压力峰值 (MPa)
+const SIM_PERIOD = 30;                      // 一个完整周期（秒）：0 → 1 → 0
+const SIM_START = Date.now();                // 模拟起始时间，用于按时间计算正弦相位
+// ==========================================================================
 
 const client = new ModbusRTU();
 let pollTimer = null;
@@ -22,6 +33,27 @@ const startPollingTimer = () => {
   if (isPolling) return;
   isPolling = true;
   pollTimer = setInterval(async () => {
+    // ================= 模拟压力分支（测试用） =================
+    // 正弦波形：0 → 1 MPa 平滑上升 → 平滑回落 → 0，周期 SIM_PERIOD 秒，循环。
+    // 正弦波让峰谷都是圆弧过渡，比线性爬坡更接近真实加压/泄压曲线。
+    // 正式使用时将顶部 SIMULATE_PRESSURE 改为 false，走下方真实传感器分支。
+    if (SIMULATE_PRESSURE) {
+      const elapsed = (Date.now() - SIM_START) / 1000;                                    // 已运行秒数
+      const phase = (2 * Math.PI * elapsed) / SIM_PERIOD;                                 // 正弦相位
+      simPressure = (SIM_MAX * (1 - Math.cos(phase))) / 2;                                // 0→1→0 平滑循环
+
+      const pressure = Number(simPressure.toFixed(2)); // 与真实数据一致：保留两位小数
+      const isWarn = pressure > PRESSURE_MAX;
+      const status = isWarn ? '超压报警' : '正常';
+      broadcast({
+        pressure,
+        status,
+        warn: isWarn,
+        time: new Date().toLocaleTimeString()
+      });
+      return; // 模拟模式下不读 Modbus，直接下发下一帧
+    }
+    // ================= 真实传感器分支 =================
     if (!client.isOpen) return;
     try {
       // 读寄存器地址 0，长度 1
@@ -32,7 +64,6 @@ const startPollingTimer = () => {
       if (rawValue > 32767) {
         rawValue = rawValue - 65536;
       }
-      
       let pressure = rawValue / DIVISOR;
       // if (pressure < 0) pressure = 0; // 防止负压漂移
       pressure = Number(pressure.toFixed(2)); // 在源头保留两位小数

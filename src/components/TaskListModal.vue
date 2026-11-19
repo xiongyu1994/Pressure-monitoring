@@ -122,6 +122,10 @@ const loadData = async () => {
     tableData.value = data.list || []
     total.value = data.total || 0
     pagination.itemCount = data.total || 0
+    // 默认选中第一条数据
+    if (tableData.value.length && !tableData.value.some((r) => r.id === activeRowId.value)) {
+      activeRowId.value = tableData.value[0].id
+    }
   } catch (err) {
     message.error(err.message || '加载任务列表失败')
     tableData.value = []

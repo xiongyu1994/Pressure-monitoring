@@ -13,9 +13,8 @@
     <div class="modal-content">
       <n-checkbox-group v-model:value="checkedItems">
         <n-space vertical size="large">
-          <n-checkbox value="first" label="删除第一次实验数据" />
-          <n-checkbox value="second" label="删除第二次实验数据" />
-          <n-checkbox value="third" label="删除第三次实验数据" />
+          <!-- 按当前已抓取的曲线记录数动态生成：删除第 N 次实验数据 -->
+          <n-checkbox v-for="n in curveCount" :key="n" :value="n" :label="`删除第${cn(n)}次实验数据`" />
         </n-space>
       </n-checkbox-group>
 
@@ -40,16 +39,25 @@
 import { ref } from 'vue'
 import { NModal, NCheckboxGroup, NCheckbox, NSpace, NButton, useMessage } from 'naive-ui'
 
+const emit = defineEmits(['confirm'])
+
 // 控制弹窗显示
 const showModal = ref(false)
 const message = useMessage()
 
-// 绑定的选中项（存储的是 n-checkbox 的 value）
+// 当前已抓取的曲线记录数（打开弹窗时由父组件传入）
+const curveCount = ref(3)
+
+// 绑定的选中项（存储的是第几次记录，1 开始）
 const checkedItems = ref([])
+
+// 中文序号：第一次 / 第二次 / 第三次…
+const CN_NUMS = ['一', '二', '三', '四', '五', '六', '七', '八', '九', '十']
+const cn = (n) => CN_NUMS[n - 1] || n
 
 // 全选逻辑
 const handleSelectAll = () => {
-  checkedItems.value = ['first', 'second', 'third']
+  checkedItems.value = Array.from({ length: curveCount.value }, (_, i) => i + 1)
 }
 
 // 全不选逻辑
@@ -57,24 +65,24 @@ const handleClearAll = () => {
   checkedItems.value = []
 }
 
-// 确定逻辑
+// 确定逻辑：通知父组件删除对应次数的曲线记录，并重新抓取补齐
 const handleConfirm = () => {
   if (checkedItems.value.length === 0) {
     message.warning('请至少选择一项要删除的数据')
     return
   }
-  
-  console.log('需要删除的数据：', checkedItems.value)
-  
-  // 💡 这里可以触发向 Node.js 发送清空数据的 WebSocket 指令
-  // wsInstance.send(JSON.stringify({ action: 'clearData', targets: checkedItems.value }))
-  
-  message.success('已重置选中的校验数据')
+  emit('confirm', [...checkedItems.value].sort((a, b) => a - b))
+  message.success('已删除选中的校验数据，将重新抓取补齐')
   showModal.value = false
 }
 
-// 暴露给父组件调用
-const open = () => {
+// 暴露给父组件调用：open(已抓取次数)
+const open = (count = 3) => {
+  curveCount.value = Math.max(Number(count) || 0, 0)
+  if (!curveCount.value) {
+    message.warning('暂无已抓取的曲线数据')
+    return
+  }
   // 每次打开时清空选中状态
   checkedItems.value = []
   showModal.value = true

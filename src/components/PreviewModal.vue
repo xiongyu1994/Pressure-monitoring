@@ -35,77 +35,99 @@
             size="small"
             class="custom-descriptions"
           >
-            <n-descriptions-item label="使用单位">武汉齐达康能源装备有限公司</n-descriptions-item>
-            <n-descriptions-item label="设备类型">管道</n-descriptions-item>
-            <n-descriptions-item label="安全阀类型">弹簧式</n-descriptions-item>
-            
-            <n-descriptions-item label="工作压力">0.40</n-descriptions-item>
-            <n-descriptions-item label="要求整定压力">0.50</n-descriptions-item>
-            <n-descriptions-item label="制造单位">合飞阀门有限公司</n-descriptions-item>
-            
-            <n-descriptions-item label="安全阀型号">A22Y-40C</n-descriptions-item>
-            <n-descriptions-item label="工作介质">天然气</n-descriptions-item>
-            <n-descriptions-item label="压力级别范围">0.3 - 0.7</n-descriptions-item>
-            
-            <n-descriptions-item label="校验日期">2026年11月10日</n-descriptions-item>
-            <n-descriptions-item label="校验编号">2026113245</n-descriptions-item>
-            <n-descriptions-item label="执行标准">TSG 92-2021</n-descriptions-item>
+            <n-descriptions-item label="使用单位">{{ fmtV(task?.custName) }}</n-descriptions-item>
+            <n-descriptions-item label="设备类型">{{ fmtV(task?.equipType) }}</n-descriptions-item>
+            <n-descriptions-item label="安全阀类型">{{ fmtV(task?.vavleType) }}</n-descriptions-item>
+
+            <n-descriptions-item label="工作压力">{{ fmtV(task?.workingPress) }}</n-descriptions-item>
+            <n-descriptions-item label="要求整定压力">{{ fmtV(task?.setPress) }}</n-descriptions-item>
+            <n-descriptions-item label="制造单位">{{ fmtV(task?.manufacturer) }}</n-descriptions-item>
+
+            <n-descriptions-item label="安全阀型号">{{ fmtV(task?.vavleModel) }}</n-descriptions-item>
+            <n-descriptions-item label="工作介质">{{ fmtV(task?.workingMedia) }}</n-descriptions-item>
+            <n-descriptions-item label="压力级别范围">{{ pressClassRange }}</n-descriptions-item>
+
+            <n-descriptions-item label="校验日期">{{ todayText }}</n-descriptions-item>
+            <n-descriptions-item label="校验编号">{{ fmtV(task?.orderCode) }}</n-descriptions-item>
+            <n-descriptions-item label="执行标准">{{ standardText }}</n-descriptions-item>
           </n-descriptions>
         </div>
       </div>
 
       <n-divider style="margin: 16px 0;" />
 
-      <!-- 3. 压力曲线图区 -->
+      <!-- 3. 压力曲线图区：当前校验编号抓取的 3 段定压记录曲线 -->
       <div class="chart-section">
         <div class="section-title">定压记录</div>
-        <div class="charts-grid">
-          <div class="chart-card">
+        <div v-if="displayCurves.length" class="charts-grid">
+          <div v-for="(c, i) in displayCurves" :key="i" class="chart-card">
             <div class="chart-header">
-              <span>第一次</span>
-              <span class="chart-val">0.50 <small>MPa</small></span>
+              <span>{{ REC_LABELS[i] }}</span>
+              <span class="chart-val">{{ fmtPeak(c.peak) }} <small>MPa</small></span>
             </div>
-            <div ref="chart1Ref" class="chart-box"></div>
-          </div>
-          
-          <div class="chart-card">
-            <div class="chart-header">
-              <span>第二次</span>
-              <span class="chart-val">0.51 <small>MPa</small></span>
-            </div>
-            <div ref="chart2Ref" class="chart-box"></div>
-          </div>
-
-          <div class="chart-card">
-            <div class="chart-header">
-              <span>第三次</span>
-              <span class="chart-val">0.50 <small>MPa</small></span>
-            </div>
-            <div ref="chart3Ref" class="chart-box"></div>
+            <div :ref="(el) => setChartRef(el, i)" class="chart-box"></div>
           </div>
         </div>
+        <div v-else class="charts-empty">暂无定压记录曲线，请先在整定压力模式下抓取曲线记录</div>
       </div>
     </div>
   </n-modal>
 </template>
 
 <script setup>
-import { ref, nextTick } from 'vue'
-import { 
-  NModal, NForm, NFormItem, NInput, NDatePicker, NDivider, NDescriptions, NDescriptionsItem 
+import { ref, computed, nextTick } from 'vue'
+import {
+  NModal, NForm, NFormItem, NInput, NDatePicker, NDivider, NDescriptions, NDescriptionsItem
 } from 'naive-ui'
 import * as echarts from 'echarts'
 
-const showModal = ref(false)
-const chart1Ref = ref(null)
-const chart2Ref = ref(null)
-const chart3Ref = ref(null)
+// ================= 外部数据 =================
+// task：当前校验编号的任务行（Home 传入，/c/task/list 数据）
+// curves：该单号抓取的定压记录曲线（PressureMonitorNew 曲线抓取产出，1~3 条）
+const props = defineProps({
+  task: { type: Object, default: null },
+  curves: { type: Array, default: () => [] }
+})
 
+const showModal = ref(false)
 const dateRange = ref(null)
 
-let chart1 = null
-let chart2 = null
-let chart3 = null
+// 空值显示 --
+const fmtV = (val) => (val === null || val === undefined || val === '' ? '--' : val)
+const fmtPeak = (p) => (p === null || p === undefined || !Number.isFinite(Number(p)) ? '--' : Number(p).toFixed(2))
+
+// 压力级别范围：压力级别下限 ~ 上限
+const pressClassRange = computed(() => {
+  const lo = props.task?.pressClassRangeMin
+  const hi = props.task?.pressClassRangeMax
+  if (lo === undefined && hi === undefined) return '--'
+  return `${fmtV(lo)} - ${fmtV(hi)}`
+})
+
+// 校验日期：当天
+const todayText = computed(() => {
+  const n = new Date()
+  return `${n.getFullYear()}年${n.getMonth() + 1}月${n.getDate()}日`
+})
+
+// 执行标准：填写评论里选中的标准（localStorage 持久化，CommentFormModal 写入）
+const standardText = computed(() => {
+  try {
+    const arr = JSON.parse(window.localStorage.getItem('pm-standard-selected') || 'null')
+    if (Array.isArray(arr) && arr.length) return arr.join('；')
+  } catch (e) { /* 存储异常时显示默认 */ }
+  return '--'
+})
+
+// ================= 定压记录曲线 =================
+const REC_LABELS = ['第一次', '第二次', '第三次']
+// 最多展示前 3 段曲线
+const displayCurves = computed(() => (props.curves || []).slice(0, 3))
+
+// 动态收集图表容器 DOM
+const chartEls = []
+const setChartRef = (el, i) => { chartEls[i] = el }
+let chartInstances = []
 
 // 👇 获取当天时间范围
 const getTodayRange = () => {
@@ -115,29 +137,37 @@ const getTodayRange = () => {
   return [start, end]
 }
 
-const getChartOption = (titleData) => {
+// 曲线图表配置：绿色平滑曲线 + 浅色面积填充，Y 轴上限按峰值放大
+const getChartOption = (curve) => {
+  const peak = Number(curve?.peak)
+  const yMax = Number.isFinite(peak) && peak > 0
+    ? Math.max(Math.ceil(peak * 1.3 * 10) / 10, 0.2)
+    : 1.0
   return {
     grid: { top: 10, right: 10, bottom: 20, left: 40 },
+    tooltip: { trigger: 'axis' },
     xAxis: {
       type: 'category',
-      data: ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10'],
+      data: Array.from({ length: 101 }, (_, i) => i),
+      boundaryGap: false,
       axisLine: { lineStyle: { color: '#333' } },
-      axisLabel: { color: '#666', fontSize: 10 }
+      axisLabel: { color: '#666', fontSize: 10, interval: 9 } // 每 10 个刻度显示一次
     },
     yAxis: {
       type: 'value',
       min: 0,
-      max: 1.0,
+      max: yMax,
       axisLine: { show: true, lineStyle: { color: '#333' } },
       axisLabel: { color: '#666', fontSize: 10, formatter: (v) => v.toFixed(2) },
       splitLine: { lineStyle: { color: '#eee' } }
     },
     series: [
       {
-        data: titleData,
+        data: curve?.points || [],
         type: 'line',
         smooth: true,
         symbol: 'none',
+        connectNulls: false,
         lineStyle: { color: '#52c41a', width: 1.5 },
         areaStyle: { color: 'rgba(82, 196, 26, 0.05)' } // 增加一点微弱的面积填充
       }
@@ -146,18 +176,17 @@ const getChartOption = (titleData) => {
 }
 
 const initCharts = () => {
-  if (chart1Ref.value) {
-    chart1 = echarts.init(chart1Ref.value)
-    chart1.setOption(getChartOption([0, 0.1, 0.3, 0.45, 0.5, 0.52, 0.5, 0.48, 0.4, 0.2]))
-  }
-  if (chart2Ref.value) {
-    chart2 = echarts.init(chart2Ref.value)
-    chart2.setOption(getChartOption([0, 0.05, 0.2, 0.4, 0.48, 0.51, 0.51, 0.49, 0.3, 0.1]))
-  }
-  if (chart3Ref.value) {
-    chart3 = echarts.init(chart3Ref.value)
-    chart3.setOption(getChartOption([0, 0.2, 0.35, 0.42, 0.5, 0.5, 0.49, 0.45, 0.2, 0]))
-  }
+  // 释放旧实例，按当前曲线数量重建
+  chartInstances.forEach((c) => c && c.dispose())
+  chartInstances = []
+  displayCurves.value.forEach((curve, i) => {
+    const el = chartEls[i]
+    if (el) {
+      const inst = echarts.init(el)
+      inst.setOption(getChartOption(curve))
+      chartInstances.push(inst)
+    }
+  })
 }
 
 const open = () => {
@@ -239,6 +268,14 @@ $border-color: #e8e8e8;
   // 图表展示区
   .chart-section {
     padding-left: 12px;
+
+    .charts-empty {
+      padding: 30px 0;
+      text-align: center;
+      color: #999;
+      font-size: 13px;
+    }
+
     .charts-grid {
       display: grid;
       grid-template-columns: repeat(3, 1fr);

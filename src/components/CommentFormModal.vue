@@ -32,18 +32,41 @@
       <!-- 执行标准 & 备注 -->
       <n-grid :cols="24" :x-gap="24">
         <n-form-item-gi :span="12" label="执行标准">
-          <n-input v-model:value="formData.standard" placeholder="请输入或选择执行标准" />
+          <n-popover trigger="click" v-model:show="stdPopShow" placement="bottom-start" :width="320">
+            <template #trigger>
+              <n-input :value="standardText" readonly placeholder="请选择执行标准" />
+            </template>
+            <!-- 执行标准多选面板：复选列表 + 全选 + 确定/取消 -->
+            <div class="std-panel">
+              <n-checkbox-group v-model:value="stdDraft">
+                <div v-for="s in STANDARD_OPTIONS" :key="s" class="std-item">
+                  <n-checkbox :value="s" :label="s" />
+                </div>
+              </n-checkbox-group>
+              <div class="std-foot">
+                <n-checkbox
+                  :checked="allChecked"
+                  :indeterminate="someChecked"
+                  @update:checked="toggleAll"
+                >全选</n-checkbox>
+                <n-space :size="8">
+                  <n-button size="small" type="primary" @click="applyStd">确定</n-button>
+                  <n-button size="small" type="error" @click="cancelStd">取消</n-button>
+                </n-space>
+              </div>
+            </div>
+          </n-popover>
         </n-form-item-gi>
         <n-form-item-gi :span="12" label="备注">
           <n-input v-model:value="formData.remark" placeholder="请输入备注" />
         </n-form-item-gi>
       </n-grid>
 
-      <!-- 新增 -->
+      <!-- 新增：把自定义标准追加进执行标准下拉选项 -->
       <n-form-item label="新增">
         <div style="display: flex; gap: 8px;">
-          <n-input v-model:value="formData.newItem" placeholder="新增内容" />
-          <n-button type="primary" style="width: 40px; padding: 0;">
+          <n-input v-model:value="formData.newItem" placeholder="新增执行标准" @keyup.enter="addStandard" />
+          <n-button type="primary" style="width: 40px; padding: 0;" @click="addStandard">
             <template #icon><n-icon><AddOutline /></n-icon></template>
           </n-button>
         </div>
@@ -157,11 +180,11 @@
 </template>
 
 <script setup>
-import { ref, reactive } from 'vue'
-import { 
-  NModal, NForm, NGrid, NFormItemGi, NInput, NSelect, 
-  NButton, NIcon, NInputGroup, NInputGroupLabel, 
-  NRadioGroup, NRadio, NCheckboxGroup, NCheckbox, NSpace 
+import { ref, reactive, computed, watch } from 'vue'
+import {
+  NModal, NForm, NGrid, NFormItemGi, NInput, NSelect,
+  NButton, NIcon, NInputGroup, NInputGroupLabel,
+  NRadioGroup, NRadio, NCheckboxGroup, NCheckbox, NSpace, NPopover
 } from 'naive-ui'
 import { AddOutline } from '@vicons/ionicons5'
 
@@ -174,12 +197,94 @@ const checkOptions = [
   { label: '不合格', value: '不合格' }
 ]
 
+// ================= 执行标准多选 =================
+// 选项列表持久化到 localStorage，新增的自定义标准刷新后仍在
+const STD_OPTIONS_KEY = 'pm-standard-options'
+const DEFAULT_STANDARDS = [
+  'TSG 92-2026',
+  'GB/T12241-2021',
+  'GB/T12243-2021',
+  'TSGZF001-2006及修改单'
+]
+const loadStandards = () => {
+  try {
+    const raw = window.localStorage.getItem(STD_OPTIONS_KEY)
+    const arr = raw ? JSON.parse(raw) : null
+    if (Array.isArray(arr) && arr.length) return arr
+  } catch (e) { /* 存储损坏时回退默认 */ }
+  return [...DEFAULT_STANDARDS]
+}
+const saveStandards = () => {
+  try { window.localStorage.setItem(STD_OPTIONS_KEY, JSON.stringify(STANDARD_OPTIONS.value)) } catch (e) { /* file:// 下忽略 */ }
+}
+
+// 选项列表：ref 保证「新增」追加后弹层实时更新
+const STANDARD_OPTIONS = ref(loadStandards())
+const stdPopShow = ref(false)
+const STD_SELECTED_KEY = 'pm-standard-selected'
+
+// 已确认的选中项：优先恢复上次确认的选择，首次使用默认前三项
+const loadStdSelected = () => {
+  try {
+    const arr = JSON.parse(window.localStorage.getItem(STD_SELECTED_KEY) || 'null')
+    if (Array.isArray(arr) && arr.length) return arr
+  } catch (e) { /* 存储异常时用默认值 */ }
+  return ['TSG 92-2026', 'GB/T12241-2021', 'GB/T12243-2021']
+}
+const stdSelected = ref(loadStdSelected())                                   // 已确认的选中项
+const saveStdSelected = () => {
+  try { window.localStorage.setItem(STD_SELECTED_KEY, JSON.stringify(stdSelected.value)) } catch (e) { /* file:// 下忽略 */ }
+}
+const stdDraft = ref([...stdSelected.value])                                 // 弹层内的草稿选中项
+
+// 新增自定义标准：追加进执行标准选项并自动勾选，持久保存
+const addStandard = () => {
+  const text = formData.newItem.trim()
+  if (!text) {
+    window.$message?.warning('请输入要新增的标准内容')
+    return
+  }
+  if (STANDARD_OPTIONS.value.includes(text)) {
+    window.$message?.warning('该标准已存在')
+    return
+  }
+  STANDARD_OPTIONS.value.push(text)
+  saveStandards()
+  // 若弹层开着，草稿里同步勾选新项；未打开则记为已选中
+  if (stdPopShow.value) {
+    if (!stdDraft.value.includes(text)) stdDraft.value.push(text)
+  } else {
+    if (!stdSelected.value.includes(text)) stdSelected.value.push(text)
+    formData.standard = standardText.value
+  }
+  formData.newItem = ''
+  window.$message?.success('已添加到执行标准选项')
+}
+
+// 输入框展示：选中项用「；」拼接（与校验台软件一致）
+const standardText = computed(() => stdSelected.value.join('；'))
+
+// 打开弹层时用已确认项重置草稿
+watch(stdPopShow, (v) => { if (v) stdDraft.value = [...stdSelected.value] })
+
+const allChecked = computed(() => stdDraft.value.length === STANDARD_OPTIONS.value.length)
+const someChecked = computed(() => stdDraft.value.length > 0 && !allChecked.value)
+const toggleAll = (checked) => { stdDraft.value = checked ? [...STANDARD_OPTIONS.value] : [] }
+
+const applyStd = () => {
+  stdSelected.value = [...stdDraft.value]
+  saveStdSelected() // 持久化，预览弹窗的「执行标准」读取同一份数据
+  formData.standard = standardText.value
+  stdPopShow.value = false
+}
+const cancelStd = () => { stdPopShow.value = false }
+
 // 表单数据
 const formData = reactive({
   reportNo: '2026113296',
   appearance: '合格',
   disassembly: '合格',
-  standard: 'TSG 92-2026, GB/T12241-2021; GB/T',
+  standard: 'TSG 92-2026；GB/T12241-2021；GB/T12243-2021',
   remark: '无',
   newItem: '',
   medium: '氮气',
@@ -216,6 +321,21 @@ defineExpose({ open })
 // 使用 Naive UI 时，表单标签默认会偏上。我们可以微调一下让其对齐更好看
 :deep(.n-form-item-label) {
   color: #333;
+}
+
+// 执行标准多选面板
+.std-panel {
+  .std-item {
+    padding: 4px 0;
+  }
+  .std-foot {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid #e0e0e0;
+  }
 }
 
 // 结论区域的灰色背景框，让视觉更聚焦
