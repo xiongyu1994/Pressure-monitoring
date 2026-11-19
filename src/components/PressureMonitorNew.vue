@@ -1,7 +1,7 @@
 <template>
   <div class="monitor-container">
     <!-- 顶部操作栏 -->
-    <div class="header">
+    <!-- <div class="header">
       <h2>压力实时监控系统</h2>
       <div class="address-switcher" data-html2canvas-ignore="true">
         <span>当前设备：</span>
@@ -16,9 +16,8 @@
         </button>
       </div>
       
-    </div>
-    <div class="actions">
-        <!-- ⚠️ 新增：零点校准按钮 -->
+    </div> -->
+    <!-- <div class="actions">
         <button 
           class="action-btn calibrate-btn" 
           @click="handleCalibrate"
@@ -27,16 +26,6 @@
         >
           {{ isCalibrating ? '⏳ 校准中...' : '🎯 零点校准' }}
         </button>
-
-         <!-- <n-button 
-          type="primary" 
-          :loading="isCalibrating"
-          @click="handleCalibrate"
-          data-html2canvas-ignore="true"
-        >
-          {{ isCalibrating ? '校准中...' : '🎯 零点校准' }}
-        </n-button> -->
-
         <button 
           class="action-btn pause-btn" 
           :class="{ 'is-paused': isPaused }" 
@@ -54,12 +43,12 @@
         >
           {{ isExporting ? '生成中...' : '📄 导出 PDF 报告' }}
         </button>
-      </div>
+      </div> -->
     
-    <!-- 需要被导出的区域 -->
+   
     <div class="export-area" ref="exportAreaRef">
-      <!-- 数据卡片区 -->
-      <div class="panel">
+     
+      <!-- <div class="panel">
         <div class="card" :class="{ alarm: isAlarm }">
           <div>当前压力 (MPa) <span v-if="isPaused && !isExporting">(已暂停)</span></div>
           <div class="val">{{ displayPressure }}</div>
@@ -74,7 +63,7 @@
           <div>报告生成时间</div>
           <div class="val time-val">{{ currentTime }}</div>
         </div>
-      </div>
+      </div> -->
 
       <!-- 图表容器 -->
       <div ref="chartRef" class="chart-box"></div>
@@ -446,7 +435,7 @@ h2 {color:#000}
 .time-val { font-size: 16px; margin-top: 14px; }
 
 /* 图表容器 */
-.chart-box { width: 100%; height: 400px; background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); box-sizing: border-box; }
+.chart-box { width: 100%; height: 400px; background: #fff; border-radius: 8px;  box-sizing: border-box; }
 
 /* 报告底部样式 */
 .report-footer { margin-top: 20px; padding: 20px; background: #fff; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
