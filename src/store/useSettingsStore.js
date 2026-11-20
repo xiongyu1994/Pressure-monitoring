@@ -16,6 +16,18 @@ export const RANGE_CHANNELS = [
   { no: 5, label: '量程5', value: 60.0 }
 ]
 
+// 生效量程档位序号（1~5）——统一的选档规则，图表 Y 轴 / 操作设置弹窗 / 信息填写弹窗共用：
+//   手动量程（未勾自动量程）→ 用户所选档位
+//   自动量程 → 按任务压力级别范围上限选最小能覆盖的档位
+//   （0.50~0.70 → 量程1(1.6)；10~15 → 量程4(16)；无范围/超全档取最大档）
+export const resolveEffectiveChannel = (autoRange, rangeChannel, pressClassRangeMax) => {
+  if (!autoRange) return rangeChannel
+  const hi = Number(pressClassRangeMax)
+  if (!Number.isFinite(hi) || hi <= 0) return RANGE_CHANNELS[RANGE_CHANNELS.length - 1].no
+  const ch = RANGE_CHANNELS.find((c) => c.value >= hi)
+  return ch ? ch.no : RANGE_CHANNELS[RANGE_CHANNELS.length - 1].no
+}
+
 // 压力表默认预填的标准量程序列 + 精度等级
 const DEFAULT_GAUGE_RANGES = [0.04, 0.06, 0.1, 0.16, 0.25, 0.4, 0.6, 1.0, 1.6, 2.5, 4.0, 6.0, 10.0, 16.0, 25.0]
 const DEFAULT_GAUGE_ACCURACY = '0.4'

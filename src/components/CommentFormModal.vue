@@ -148,7 +148,7 @@
               <n-input />
             </n-input-group>
             <div style="display: flex; gap: 10px; color: #666; font-size: 13px;">
-              <span>量程 (MPa): 0.1</span>
+              <span>量程 (MPa): {{ effectiveRange }}</span>
               <span>精度等级: 0.4</span>
             </div>
           </div>
@@ -187,9 +187,22 @@ import {
   NRadioGroup, NRadio, NCheckboxGroup, NCheckbox, NSpace, NPopover
 } from 'naive-ui'
 import { AddOutline } from '@vicons/ionicons5'
+import { useSettingsStore, RANGE_CHANNELS, resolveEffectiveChannel } from '@/store/useSettingsStore'
+
+const props = defineProps({
+  // 当前开始整定的任务行，自动量程按其压力级别范围选档
+  task: { type: Object, default: null }
+})
 
 const showModal = ref(false)
 const formRef = ref(null)
+
+const settingsStore = useSettingsStore()
+// 当前生效量程（MPa）：与图表 Y 轴 / 操作设置弹窗同一条选档规则
+const effectiveRange = computed(() => {
+  const no = resolveEffectiveChannel(settingsStore.autoRange, settingsStore.rangeChannel, props.task?.pressClassRangeMax)
+  return RANGE_CHANNELS.find((c) => c.no === no)?.value ?? '--'
+})
 
 // 检查项下拉框数据
 const checkOptions = [

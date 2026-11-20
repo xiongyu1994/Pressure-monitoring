@@ -3,7 +3,7 @@
 // GET /c/task/list?custName=&idNo=&orderCode=&page=&limit=
 // 返回 { list, total, page, limit }，list 字段见 capi.php 的 api_c_task_list。
 import { useAuthStore } from '@/store/useAuthStore'
-import { apiGet, isRemoteAuth } from './auth'
+import { apiGet, apiPost, isRemoteAuth } from './auth'
 
 // 本地演示数据（未配置后端时使用）
 const MOCK_TASKS = [
@@ -49,4 +49,20 @@ export async function fetchTaskList({
     { custName, idNo, orderCode, page, limit },
     auth.token
   )
+}
+
+// 领取任务（开始整定时调用）：wait → inspection，后端同时把 inspector 记为操作员姓名
+// 返回 { orderCode, status }；他人已领取时后端会报错
+export async function claimTask(id) {
+  if (!isRemoteAuth) {
+    // 本地演示模式：直接把对应假数据标记为检验中
+    const t = MOCK_TASKS.find((item) => item.id === id)
+    if (t) {
+      t.status = 'inspection'
+      t.inspector = t.inspector || '操作员'
+    }
+    return { orderCode: t?.orderCode || '', status: 'inspection' }
+  }
+  const auth = useAuthStore()
+  return apiPost('/c/task/claim', { id }, auth.token)
 }

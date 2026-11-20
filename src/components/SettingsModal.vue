@@ -3,7 +3,7 @@
     v-model:show="showModal"
     preset="card"
     title="操作设置"
-    style="width: 640px; max-width: 92vw;"
+    style="width: 700px; max-width: 92vw;"
     :bordered="false"
     :segmented="{ content: true }"
     :closable="true"
@@ -53,7 +53,7 @@
         </div>
         <div class="range-line">
           <span class="row-label" style="width: 70px;">量程切换</span>
-          <n-radio-group v-model:value="rangeChannel" :disabled="autoRange" size="small">
+          <n-radio-group v-model:value="displayRangeChannel" :disabled="autoRange" size="small">
             <n-space :size="14" :wrap="false">
               <n-radio v-for="ch in RANGE_CHANNELS" :key="ch.no" :value="ch.no">
                 {{ ch.label }}({{ ch.value }}MPa)
@@ -93,11 +93,16 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { NModal, NRadioGroup, NRadio, NCheckbox, NInput, NInputNumber, NButton, NSpace, useMessage } from 'naive-ui'
 import { storeToRefs } from 'pinia'
 import { useSettingsStore, RANGE_CHANNELS } from '@/store/useSettingsStore'
 import GaugeModal from './GaugeModal.vue'
+
+const props = defineProps({
+  // 当前开始整定的任务行（/c/task/list 数据），自动量程按其压力级别范围选档
+  task: { type: Object, default: null }
+})
 
 const showModal = ref(false)
 const message = useMessage()
@@ -105,6 +110,23 @@ const message = useMessage()
 const settingsStore = useSettingsStore()
 // 解构到顶层：顶层 ref 在模板中自动解包，v-model 才能正常双向绑定
 const { record, autoRange, rangeChannel, monitorPath, autoJudge, sealTime } = storeToRefs(settingsStore)
+
+// 自动量程档位：按当前任务压力级别范围上限，取最小能覆盖的量程档
+// （如 0.50~0.70MPa → 量程1(1.6)；10~15MPa → 量程4(16)；无任务/超全档取最大档）
+const autoChannelNo = computed(() => {
+  const hi = Number(props.task?.pressClassRangeMax)
+  if (!Number.isFinite(hi) || hi <= 0) return RANGE_CHANNELS[RANGE_CHANNELS.length - 1].no
+  const ch = RANGE_CHANNELS.find((c) => c.value >= hi)
+  return ch ? ch.no : RANGE_CHANNELS[RANGE_CHANNELS.length - 1].no
+})
+
+// 量程切换单选显示"生效中"的档位：
+// 勾选自动量程 → 显示按压力级别范围自动选中的档位（禁用态，仅展示）
+// 手动模式 → 显示/修改用户所选档位
+const displayRangeChannel = computed({
+  get: () => (autoRange.value ? autoChannelNo.value : rangeChannel.value),
+  set: (v) => { rangeChannel.value = v }
+})
 
 const gaugeModalRef = ref()
 

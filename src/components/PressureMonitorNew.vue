@@ -65,7 +65,7 @@
       <!-- 当前压力标题：降压密封模式下隐藏（顶部已有橙色实时压力块） -->
       <n-space v-if="mode !== 'seal'" align="center">
        <h3 style="color:#000">当前压力 (MPa) <span v-if="isPaused && !isExporting">(已暂停)</span></h3>
-       <p style="color:#000">{{ displayPressure }}</p>
+       <p style="color:#2b5aa5;font-size:24px;font-weight: bold;">{{ displayPressure }}</p>
        <span v-if="curveProgressText" class="curve-progress">{{ curveProgressText }}</span>
        <span v-if="mode === 'setPressure'" class="rise-rate">升压速率：{{ riseRateText }} MPa/s</span>
       </n-space>
@@ -93,7 +93,8 @@
       <div class="chart-row">
         <div ref="chartRef" class="chart-box"></div>
 
-        <aside v-if="task && mode === 'setPressure'" class="info-panel">
+        <!-- 已开始整定（有任务）即显示信息面板；降压密封模式有独立的上下操作条，不显示面板 -->
+        <aside v-if="task && mode !== 'seal'" class="info-panel">
           <div class="panel-title">安全阀信息</div>
           <div class="info-rows">
             <div class="info-row"><span class="label">校验编号</span><span class="value">{{ task.orderCode || '--' }}</span></div>
@@ -108,7 +109,7 @@
           <div class="panel-section">推荐压力表量程 (MPa)</div>
           <div class="gauge-rows">
             <div class="info-row"><span class="label">推荐量程</span><span class="value">{{ gaugeRange }}</span></div>
-            <div class="info-row"><span class="label">安装通道</span><span class="value">第 1 通道</span></div>
+            <div class="info-row"><span class="label">安装通道</span><span class="value">第 {{ effectiveChannelNo }} 通道</span></div>
           </div>
 
           <div class="panel-section">适用校验座及夹紧力</div>
@@ -243,7 +244,7 @@ watchEffect(() => {
 //   峰值前：从「开始」阈值（% 按本次实测峰值折算，MPa 为直接值）上穿到峰值
 //   峰值后：再记录「结束」设定时长（% → 起录→峰值时间 × value%；MPa → 压力回落到该值即止）
 //   生成曲线数据时拉伸重采样铺满 0~100，峰值居中，全程无断点
-import { useSettingsStore } from '@/store/useSettingsStore'
+import { useSettingsStore, RANGE_CHANNELS, resolveEffectiveChannel } from '@/store/useSettingsStore'
 const settingsStore = useSettingsStore()
 
 const CURVE_COUNT = 3   // 每个校验单号总共抓取 3 次曲线记录
@@ -518,9 +519,64 @@ const rateText = computed(() => {
 // 升压速率（整定压力模式）：复用平滑后的压力变化率，升压时为正值，降压时归零显示
 const riseRateText = computed(() => Math.max(pressureRate.value, 0).toFixed(2))
 
+// 生效量程档位序号（1~5）：统一使用 store 的选档规则（手动→所选档位；自动→按压力级别范围选最小覆盖档）
+const effectiveChannelNo = computed(() =>
+  resolveEffectiveChannel(settingsStore.autoRange, settingsStore.rangeChannel, props.task?.pressClassRangeMax)
+)
+
+// Y 轴上限（量程值 MPa）：由生效量程档位决定；档位无效时返回 null，Y 轴上限自适应
+const fixedRangeMax = computed(() => {
+  const ch = RANGE_CHANNELS.find((c) => c.no === effectiveChannelNo.value)
+  return ch ? ch.value : null
+})
+
+// 构造 Y 轴双轴配置（仿压力表盘刻度样式）：
+//   主轴：范围 5 等分 → 6 个主刻度（0、1/5、2/5…满量程），带标签和网格线
+//   副轴：同一范围 25 等分 → 每个主刻度间画 4 个小刻度线，无标签、无网格
+const buildYAxisPair = (minVal, maxVal) => {
+  const span = maxVal - minVal
+  const majorInterval = span / 5
+  // 标签小数位按主刻度间隔自适应，保证各刻度值不重复（3.2→1位，0.32→2位…）
+  const stepStr = String(majorInterval)
+  const dot = stepStr.indexOf('.')
+  const decimals = dot === -1 ? 0 : Math.min(stepStr.length - dot - 1, 3)
+  const major = {
+    type: 'value',
+    name: '压力(MPa)',
+    nameLocation: 'middle',
+    nameGap: 45,
+    nameTextStyle: { color: '#00FF00', fontSize: 14 },
+    position: 'left',
+    min: minVal,
+    max: maxVal,
+    interval: majorInterval,
+    axisLine: { show: true, lineStyle: { color: '#00FF00', width: 1 } },
+    axisTick: { show: true, inside: true, length: 6, lineStyle: { color: '#00FF00' } },
+    axisLabel: { color: '#00FF00', formatter: (v) => v.toFixed(decimals) },
+    splitLine: { show: true, lineStyle: { color: '#00FF00', type: 'solid', opacity: 0.3 } }
+  }
+  const minor = {
+    type: 'value',
+    position: 'left', // 与主轴同侧：小刻度画在最左边
+    min: minVal,
+    max: maxVal,
+    interval: span / 25,
+    axisLine: { show: false },
+    axisTick: { show: true, inside: true, length: 3, lineStyle: { color: '#00FF00' } },
+    axisLabel: { show: false },
+    splitLine: { show: false }
+  }
+  return [major, minor]
+}
+
 // 推荐压力表量程：取标准量程序列中最小的 ≥ 整定压力×2 的量程
 const GAUGE_RANGES = [0.4, 0.6, 1, 1.6, 2.5, 4, 6, 10, 16, 25, 40, 60]
+// 推荐压力表量程：与当前生效的量程档位一致（和 Y 轴上限同一条规则）
+// 自动量程 → 按任务压力级别范围选档（0.50~0.70 → 0 ~ 1.6）；手动量程 → 所选档位（量程2 → 0 ~ 4）
+// 无生效档位时退回“整定压力×2 选最小覆盖档”的规则
 const gaugeRange = computed(() => {
+  const eff = fixedRangeMax.value
+  if (eff !== null) return `0 ~ ${eff}`
   const p = Number(props.task?.setPress)
   if (!Number.isFinite(p) || p <= 0) return '--'
   const need = p * 2
@@ -682,23 +738,8 @@ const initChart = () => {
       min: 0,
       max: MAX_POINTS 
     },
-    yAxis: {
-      type: 'value',
-      name: '压力(MPa)',
-      nameLocation: 'middle',
-      nameGap: 45, 
-      nameTextStyle: { color: '#00FF00', fontSize: 14 },
-      axisLine: { show: true, lineStyle: { color: '#00FF00', width: 1 } },
-      axisTick: {
-        show: true,          // 显示小刻度线（与 X 轴样式一致）
-        inside: true,        // 刻度朝内
-        interval: 0,         // 每个刻度值都显示小刻度
-        lineStyle: { color: '#00FF00' }
-      },
-      axisLabel: { color: '#00FF00', formatter: (value) => value.toFixed(1) },
-      splitLine: { show: true, lineStyle: { color: '#00FF00', type: 'solid', opacity: 0.3 } },
-      splitNumber: 10
-    },
+    // Y 轴：主刻度 6 个 + 主刻度间小刻度（压力表盘式），实际范围随量程/数据动态更新
+    yAxis: buildYAxisPair(0, 10),
     // yAxis: {
     //   type: 'value',
     //   name: '压力(MPa)',
@@ -841,15 +882,26 @@ const connectWs = () => {
       }
 
       if (chartInstance) {
-        // 压力一直在 0 左右（窗口内最大值 < 1 MPa）时，Y 轴固定为 -0.2 ~ 1，曲线落在刚离开底轴的位置
-        const windowMax = Math.max(...chartBuffer)
-        const nearZero = windowMax < NEAR_ZERO_THRESHOLD
-        const yAxisOpt = nearZero
-          ? { min: Y_MIN_NEGATIVE, max: NEAR_ZERO_AXIS_MAX }
-          : { min: 0 }
+        // Y 轴范围（三种情况都给定明确的 min/max，保证主刻度 6 个 + 主刻度间小刻度）：
+        // 1) 量程生效（手动档位或自动量程按压力级别选档）→ 0 ~ 量程值（如量程2 → 4 MPa）
+        // 2) 自动量程且压力一直在 0 左右（窗口内最大值 < 1 MPa）→ 固定 -0.2 ~ 1，曲线落在刚离开底轴的位置
+        // 3) 自动量程高压且无任务量程 → 0 ~ 窗口最大值×1.2（向上取一位小数）
+        const fixedMax = fixedRangeMax.value
+        let yAxisPair
+        if (fixedMax !== null) {
+          yAxisPair = buildYAxisPair(0, fixedMax)
+        } else {
+          const windowMax = Math.max(...chartBuffer)
+          if (windowMax < NEAR_ZERO_THRESHOLD) {
+            yAxisPair = buildYAxisPair(Y_MIN_NEGATIVE, NEAR_ZERO_AXIS_MAX)
+          } else {
+            const autoMax = Math.ceil(windowMax * 1.2 * 10) / 10
+            yAxisPair = buildYAxisPair(0, autoMax)
+          }
+        }
         chartInstance.setOption({
           xAxis: { data: Array.from({ length: BUFFER_LEN }, (_, i) => i) },
-          yAxis: yAxisOpt,
+          yAxis: yAxisPair,
           series: [{
             name: '压力', type: 'line', smooth: true, symbol: 'none',
             lineStyle: { color: '#FF0000', width: 2 },

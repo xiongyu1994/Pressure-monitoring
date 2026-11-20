@@ -8,6 +8,7 @@
     :bordered="false"
     :segmented="{ content: true }"
     :closable="true"
+    draggable
   >
     <!-- 顶部操作栏：按钮 + 统计信息 -->
     <template #header-extra>
@@ -35,6 +36,7 @@
 
       <!-- 数据表格 -->
       <n-data-table
+        class="task-table"
         :columns="columns"
         :data="tableData"
         :loading="loading"
@@ -45,18 +47,28 @@
         striped
         size="small"
         flex-height
-        style="height: calc(85vh - 220px);"
         :row-props="rowProps"
         :row-key="(row) => row.id"
       />
+
+      <!-- 选中行安全阀基本信息（同校验台软件：列表下方展示当前选中阀的信息） -->
+      <div class="valve-info" v-if="activeRow">
+        <div class="valve-info-title">安全阀基本信息</div>
+        <div class="valve-info-grid">
+          <div class="info-cell" v-for="item in infoItems" :key="item.label">
+            <span class="info-label">{{ item.label }}：</span>
+            <span class="info-value">{{ item.value }}</span>
+          </div>
+        </div>
+      </div>
     </div>
   </n-modal>
 </template>
 
 <script setup>
-import { ref, reactive } from 'vue'
+import { ref, reactive, computed } from 'vue'
 import { NModal, NSpace, NInput, NButton, NDataTable, useMessage } from 'naive-ui'
-import { fetchTaskList } from '@/api/task'
+import { fetchTaskList, claimTask } from '@/api/task'
 
 // 控制弹窗显示
 const showModal = ref(false)
@@ -162,14 +174,63 @@ const rowProps = (row) => {
   }
 }
 
-// 开始整定
-const startTuning = () => {
+// 当前选中行（列表下方「安全阀基本信息」面板数据源）
+const activeRow = computed(() => tableData.value.find((item) => item.id === activeRowId.value) || null)
+
+// 空值统一显示 /
+const infoText = (val) => {
+  if (val === null || val === undefined || val === '') return '/'
+  return String(val)
+}
+
+// 基本信息面板字段（布局与校验台软件一致：4 列 × 3 行）
+const infoItems = computed(() => {
+  const r = activeRow.value
+  if (!r) return []
+  const range = (r.pressClassRangeMin !== null && r.pressClassRangeMin !== undefined && r.pressClassRangeMin !== '')
+    || (r.pressClassRangeMax !== null && r.pressClassRangeMax !== undefined && r.pressClassRangeMax !== '')
+    ? `${infoText(r.pressClassRangeMin)} ~ ${infoText(r.pressClassRangeMax)}`
+    : '/'
+  return [
+    { label: '安全阀类型', value: infoText(r.vavleType) },
+    { label: '安全阀型号', value: infoText(r.vavleModel) },
+    { label: '公称通径(mm)', value: infoText(r.diameterNominal) },
+    { label: '流道口径(mm)', value: infoText(r.seatSize) },
+    { label: '公称压力(MPa)', value: infoText(r.pressNominal) },
+    { label: '要求整定压力(MPa)', value: infoText(r.setPress) },
+    { label: '压力级别范围(MPa)', value: range },
+    { label: '校验编号', value: infoText(r.orderCode) },
+    { label: '制造许可证编号', value: infoText(r.licenseNo) },
+    { label: '出厂编号', value: infoText(r.manuNo) },
+    { label: '制造单位', value: infoText(r.manufacturer) },
+    { label: '使用单位', value: infoText(r.custName) }
+  ]
+})
+
+// 开始整定：先领取任务（wait → 检验中，inspector 记为操作员姓名），成功后再进入整定流程
+const startTuning = async () => {
   if (!activeRowId.value) {
     message.warning('请先在列表中选择一条任务')
     return
   }
   const row = tableData.value.find((item) => item.id === activeRowId.value)
-  emit('sendTask', { taskId: activeRowId.value, task: row })
+  if (!row) {
+    message.warning('所选任务不在当前列表中，请重新查询')
+    return
+  }
+  try {
+    // 领取接口幂等：待检验→检验中；已是检验中且是本人则直接成功；他人领取会报错中断
+    const res = await claimTask(row.id)
+    // 同步本地行状态，让列表立即显示「检验中 + 校验员」
+    row.status = res?.status || 'inspection'
+    if (res && res.inspector) row.inspector = res.inspector
+  } catch (err) {
+    // 领取失败（如已被他人领取）则不进入整定，并刷新列表拿最新状态
+    message.error(err.message || '领取任务失败')
+    loadData()
+    return
+  }
+  emit('sendTask', { taskId: row.id, task: row })
   showModal.value = false
 }
 
@@ -197,6 +258,55 @@ defineExpose({ open, activeRowId })
   padding: 10px 0 20px 0;
   border-bottom: 1px solid #eee;
   margin-bottom: 10px;
+}
+
+/* 内容区纵向布局：搜索栏 / 表格（弹性占满）/ 基本信息面板 */
+.modal-content {
+  display: flex;
+  flex-direction: column;
+  height: calc(85vh - 130px);
+  min-height: 0;
+}
+.task-table {
+  flex: 1;
+  min-height: 0;
+}
+
+/* 选中行安全阀基本信息面板 */
+.valve-info {
+  flex-shrink: 0;
+  margin-top: 8px;
+  border: 1px solid #d9d9d9;
+  border-radius: 4px;
+  padding: 8px 10px;
+  background: #fff;
+}
+.valve-info-title {
+  font-size: 13px;
+  font-weight: bold;
+  color: #333;
+  margin-bottom: 6px;
+}
+.valve-info-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+.info-cell {
+  border: 1px solid #d9d9d9;
+  border-radius: 3px;
+  padding: 5px 8px;
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.info-label {
+  color: #666;
+}
+.info-value {
+  color: #111;
+  font-weight: 500;
 }
 
 /* 💡 覆盖 Naive UI 表格选中行的样式，模拟照片里的亮蓝色背景 */

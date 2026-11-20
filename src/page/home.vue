@@ -41,16 +41,23 @@
     <!-- 预览组件：展示当前校验编号的设备信息与抓取的定压记录曲线 -->
     <PreviewModal ref="previewModalRef" :task="currentTask" :curves="taskCurves" />
     <!-- 填写评论 -->
-    <CommentFormModal ref="commentModalRef" />
+    <CommentFormModal ref="commentModalRef" :task="currentTask" />
     <!-- 重新校验弹窗 -->
     <RestartModal ref="restartModalRef" @confirm="handleRestartConfirm" />
     <!-- 操作设置弹窗（内含压力表设定） -->
-    <SettingsModal ref="settingsModalRef" />
+    <SettingsModal ref="settingsModalRef" :task="currentTask" />
 
     <!-- 底部按钮条：开始整定后显示；降压密封模式下由密封统计条替代 -->
     <div class="foot" v-if="currentTask && activeKey !== 'seal'">
       <n-space v-if="currentTask" :size="12" align="center" :wrap="false">
-        <n-button type="primary" size="small" @click="reverify">重新校验</n-button>
+        <!-- 重新校验按钮 + 下方传感器编号/完成数量 -->
+        <div class="reverify-col">
+          <n-button type="primary" size="small" @click="reverify">重新校验</n-button>
+          <div class="foot-meta">
+            <span>传感器编号：{{ sensorNo }}</span>
+            <span>完成数量：{{ doneCount }}</span>
+          </div>
+        </div>
         <p :class="verdictClass">整定压力：{{ peakText }}</p>
       </n-space>
     </div>
@@ -74,9 +81,11 @@ import {
 } from '@vicons/ionicons5'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/store/useAuthStore'
+import { useSettingsStore, resolveEffectiveChannel } from '@/store/useSettingsStore'
 
 const router = useRouter()
 const auth = useAuthStore()
+const settingsStore = useSettingsStore()
 const activeKey = ref('')
 const taskModalRef = ref()
 const previewModalRef = ref()
@@ -111,6 +120,14 @@ const verdictClass = computed(() => {
   if (peakInfo.value.verdict === 'fail') return 'verdict-fail'
   return ''
 })
+
+// 传感器编号：与生效量程档位一致（量程1~5 → 编号1~5），选档规则与 Y 轴/信息填写共用
+const sensorNo = computed(() =>
+  resolveEffectiveChannel(settingsStore.autoRange, settingsStore.rangeChannel, currentTask.value?.pressClassRangeMax)
+)
+
+// 完成数量：校验完成点击存盘后记一次（存盘接口尚未对接，暂为 0）
+const doneCount = ref(0)
 const tabs = [
     { name: 'task', label: '任务栏', icon: ListOutline },
     { name: 'setPressure', label: '整定压力', icon: TrendingDownOutline },
@@ -298,5 +315,22 @@ const handleLogout = () => {
   /* 整定压力判定染色 */
   p.verdict-pass { color: #52c41a; }
   p.verdict-fail { color: #f5222d; }
+}
+
+/* 重新校验按钮列：按钮在上，传感器编号/完成数量两行小字在下 */
+.reverify-col {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+}
+
+.foot-meta {
+  display: flex;
+  gap: 12px;
+  font-size: 12px;
+  color: #555;
+  line-height: 1.4;
+  white-space: nowrap;
 }
 </style>
